@@ -510,6 +510,7 @@ class _QuillEditorSelectionGestureDetectorBuilder
       return;
     }
 
+    final toolbarWasVisible = editor!.selectionOverlay?.toolbar != null;
     editor!.hideToolbar();
 
     try {
@@ -537,6 +538,8 @@ class _QuillEditorSelectionGestureDetectorBuilder
               break;
             case PointerDeviceKind.touch:
             case PointerDeviceKind.unknown:
+              final previousSelection = editor!.textEditingValue.selection;
+              final hadFocus = _state.widget.focusNode.hasFocus;
               // On macOS/iOS/iPadOS a touch tap places the cursor at the edge
               // of the word.
               if (_detectWordBoundary) {
@@ -547,6 +550,12 @@ class _QuillEditorSelectionGestureDetectorBuilder
                 renderEditor!
                   ..selectPosition(cause: SelectionChangedCause.tap)
                   ..onSelectionCompleted();
+              }
+              // As in EditableText, tapping the caret toggles the toolbar.
+              if (hadFocus &&
+                  !toolbarWasVisible &&
+                  previousSelection == editor!.textEditingValue.selection) {
+                editor!.showToolbar();
               }
               break;
             case PointerDeviceKind.trackpad:
