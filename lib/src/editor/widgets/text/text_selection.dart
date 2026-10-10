@@ -430,7 +430,8 @@ class _TextSelectionHandleOverlay extends StatefulWidget {
 class _TextSelectionHandleOverlayState
     extends State<_TextSelectionHandleOverlay>
     with SingleTickerProviderStateMixin {
-  // ignore: unused_field
+  /// The finger position moved onto the handle's line, so grabbing a knob
+  /// drawn above or below the text doesn't jump the selection a line.
   late Offset _dragPosition;
 
   late AnimationController _controller;
@@ -476,9 +477,9 @@ class _TextSelectionHandleOverlayState
     final textPosition = widget.position == _TextSelectionHandlePosition.start
         ? widget.selection.base
         : widget.selection.extent;
-    final lineHeight = widget.renderObject.preferredLineHeight(textPosition);
-    final handleSize = widget.selectionControls.getHandleSize(lineHeight);
-    _dragPosition = details.globalPosition + Offset(0, -handleSize.height);
+    final caret = widget.renderObject.getLocalRectForCaret(textPosition);
+    final lineCenter = widget.renderObject.localToGlobal(caret.center);
+    _dragPosition = Offset(details.globalPosition.dx, lineCenter.dy);
   }
 
   void _handleDragEnd(DragEndDetails details) {
@@ -489,8 +490,7 @@ class _TextSelectionHandleOverlayState
   void _handleDragUpdate(DragUpdateDetails details) {
     widget.dragOffsetNotifier?.value = details.globalPosition;
     _dragPosition += details.delta;
-    final position =
-        widget.renderObject.getPositionForOffset(details.globalPosition);
+    final position = widget.renderObject.getPositionForOffset(_dragPosition);
     if (widget.selection.isCollapsed) {
       widget.onSelectionHandleChanged(TextSelection.fromPosition(position));
       return;
