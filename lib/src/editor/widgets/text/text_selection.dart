@@ -434,6 +434,8 @@ class _TextSelectionHandleOverlayState
   /// drawn above or below the text doesn't jump the selection a line.
   late Offset _dragPosition;
 
+  late Offset _dragDownPosition;
+
   late AnimationController _controller;
 
   Animation<double> get _opacity => _controller.view;
@@ -479,7 +481,9 @@ class _TextSelectionHandleOverlayState
         : widget.selection.extent;
     final caret = widget.renderObject.getLocalRectForCaret(textPosition);
     final lineCenter = widget.renderObject.localToGlobal(caret.center);
-    _dragPosition = Offset(details.globalPosition.dx, lineCenter.dy);
+    // Start reports the position after the drag slop; keep that movement.
+    final slop = details.globalPosition.dy - _dragDownPosition.dy;
+    _dragPosition = Offset(details.globalPosition.dx, lineCenter.dy + slop);
   }
 
   void _handleDragEnd(DragEndDetails details) {
@@ -601,6 +605,7 @@ class _TextSelectionHandleOverlayState
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             dragStartBehavior: widget.dragStartBehavior,
+            onPanDown: (details) => _dragDownPosition = details.globalPosition,
             onPanStart: _handleDragStart,
             onPanUpdate: _handleDragUpdate,
             onPanEnd: _handleDragEnd,
