@@ -303,19 +303,8 @@ class EditorTextSelectionOverlay {
     TextSelection? newSelection,
     _TextSelectionHandlePosition position,
   ) {
-    TextPosition textPosition;
-    switch (position) {
-      case _TextSelectionHandlePosition.start:
-        textPosition = newSelection != null
-            ? newSelection.base
-            : const TextPosition(offset: 0);
-        break;
-      case _TextSelectionHandlePosition.end:
-        textPosition = newSelection != null
-            ? newSelection.extent
-            : const TextPosition(offset: 0);
-        break;
-    }
+    // The dragged handle is always the extent, on either side of the base.
+    final textPosition = newSelection?.extent ?? const TextPosition(offset: 0);
 
     final currSelection = newSelection != null
         ? DragTextSelection(
@@ -323,7 +312,7 @@ class EditorTextSelectionOverlay {
             extentOffset: newSelection.extentOffset,
             affinity: newSelection.affinity,
             isDirectional: newSelection.isDirectional,
-            first: position == _TextSelectionHandlePosition.start,
+            first: newSelection.extentOffset < newSelection.baseOffset,
           )
         : null;
 
@@ -436,6 +425,10 @@ class _TextSelectionHandleOverlayState
 
   late Offset _dragDownPosition;
 
+  /// The selection end that stays put while this handle is dragged, or null
+  /// when the handle moves a collapsed caret.
+  int? _anchorOffset;
+
   late AnimationController _controller;
 
   Animation<double> get _opacity => _controller.view;
@@ -476,10 +469,15 @@ class _TextSelectionHandleOverlayState
 
   void _handleDragStart(DragStartDetails details) {
     widget.dragOffsetNotifier?.value = details.globalPosition;
-    final textPosition = widget.position == _TextSelectionHandlePosition.start
-        ? widget.selection.base
-        : widget.selection.extent;
-    final caret = widget.renderObject.getLocalRectForCaret(textPosition);
+    final selection = widget.selection;
+    final isStart = widget.position == _TextSelectionHandlePosition.start;
+    _anchorOffset = selection.isCollapsed
+        ? null
+        : isStart
+            ? selection.end
+            : selection.start;
+    final caret = widget.renderObject.getLocalRectForCaret(
+        TextPosition(offset: isStart ? selection.start : selection.end));
     final lineCenter = widget.renderObject.localToGlobal(caret.center);
     // Start reports the position after the drag slop; keep that movement.
     final slop = details.globalPosition.dy - _dragDownPosition.dy;
@@ -495,38 +493,18 @@ class _TextSelectionHandleOverlayState
     widget.dragOffsetNotifier?.value = details.globalPosition;
     _dragPosition += details.delta;
     final position = widget.renderObject.getPositionForOffset(_dragPosition);
-    if (widget.selection.isCollapsed) {
+    final anchor = _anchorOffset;
+    if (anchor == null) {
       widget.onSelectionHandleChanged(TextSelection.fromPosition(position));
       return;
     }
-
-    final isNormalized =
-        widget.selection.extentOffset >= widget.selection.baseOffset;
-    TextSelection newSelection;
-    switch (widget.position) {
-      case _TextSelectionHandlePosition.start:
-        newSelection = TextSelection(
-          baseOffset:
-              isNormalized ? position.offset : widget.selection.baseOffset,
-          extentOffset:
-              isNormalized ? widget.selection.extentOffset : position.offset,
-        );
-        break;
-      case _TextSelectionHandlePosition.end:
-        newSelection = TextSelection(
-          baseOffset:
-              isNormalized ? widget.selection.baseOffset : position.offset,
-          extentOffset:
-              isNormalized ? position.offset : widget.selection.extentOffset,
-        );
-        break;
+    // As on iOS, the handle may cross the other one; it never collapses the
+    // selection, which would drop the handles mid-drag.
+    if (position.offset == anchor) {
+      return;
     }
-
-    if (newSelection.baseOffset >= newSelection.extentOffset) {
-      return; // don't allow order swapping.
-    }
-
-    widget.onSelectionHandleChanged(newSelection);
+    widget.onSelectionHandleChanged(
+        TextSelection(baseOffset: anchor, extentOffset: position.offset));
   }
 
   void _handleTap() {
