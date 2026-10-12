@@ -476,8 +476,11 @@ class _TextSelectionHandleOverlayState
         : isStart
             ? selection.end
             : selection.start;
-    final caret = widget.renderObject.getLocalRectForCaret(
-        TextPosition(offset: isStart ? selection.start : selection.end));
+    // At a line wrap the end's offset also starts the next line; upstream
+    // keeps it on the line where its handle is drawn.
+    final caret = widget.renderObject.getLocalRectForCaret(isStart
+        ? TextPosition(offset: selection.start)
+        : TextPosition(offset: selection.end, affinity: TextAffinity.upstream));
     final lineCenter = widget.renderObject.localToGlobal(caret.center);
     // Start reports the position after the drag slop; keep that movement.
     final slop = details.globalPosition.dy - _dragDownPosition.dy;
