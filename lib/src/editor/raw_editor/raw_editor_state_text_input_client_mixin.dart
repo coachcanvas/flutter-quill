@@ -94,6 +94,7 @@ mixin RawEditorStateTextInputClientMixin on EditorState
       );
 
       _updateSizeAndTransform();
+      updateRemoteStyleIfNeeded();
       //update IME position for Windows
       _updateComposingRectIfNeeded();
       //update IME position for Macos
@@ -114,6 +115,27 @@ mixin RawEditorStateTextInputClientMixin on EditorState
       _textInputConnection!.setEditingState(_lastKnownRemoteTextEditingValue!);
     }
     _textInputConnection!.show();
+  }
+
+  /// The style of body text, mirrored to the platform's text input.
+  @protected
+  TextStyle get textInputStyle;
+
+  /// On web the hidden editing element lays out its own copy of the text, and
+  /// iOS moves the caret through that layout (e.g. the space-bar trackpad), so
+  /// it must wrap like the painted text.
+  void updateRemoteStyleIfNeeded() {
+    if (!hasConnection) {
+      return;
+    }
+    final style = textInputStyle;
+    _textInputConnection!.setStyle(
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      textDirection: Directionality.of(context),
+      textAlign: TextAlign.start,
+    );
   }
 
   void _updateComposingRectIfNeeded() {
@@ -386,8 +408,12 @@ mixin RawEditorStateTextInputClientMixin on EditorState
     if (hasConnection) {
       // Asking for renderEditor.size here can cause errors if layout hasn't
       // occurred yet. So we schedule a post frame callback instead.
-      final size = renderEditor.size;
-      final transform = renderEditor.getTransformTo(null);
+      // The text area excludes the padding, so the web's editing element
+      // wraps lines where the painted text does.
+      final padding = renderEditor.resolvedPadding ?? EdgeInsets.zero;
+      final size = padding.deflateSize(renderEditor.size);
+      final transform = renderEditor.getTransformTo(null)
+        ..translateByDouble(padding.left, padding.top, 0, 1);
       _textInputConnection?.setEditableSizeAndTransform(size, transform);
       SchedulerBinding.instance
           .addPostFrameCallback((_) => _updateSizeAndTransform());

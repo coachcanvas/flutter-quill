@@ -76,6 +76,9 @@ class QuillRawEditorState extends EditorState
   // Theme
   DefaultStyles? _styles;
 
+  @override
+  TextStyle get textInputStyle => _styles!.paragraph!.style;
+
   // for pasting style
   @override
   List<OffsetValue> get pasteStyleAndEmbed => controller.pasteStyleAndEmbed;
@@ -896,6 +899,7 @@ class QuillRawEditorState extends EditorState
     if (widget.config.customStyles != null) {
       _styles = _styles!.merge(widget.config.customStyles!);
     }
+    updateRemoteStyleIfNeeded();
 
     _requestAutoFocusIfShould();
   }
@@ -951,6 +955,7 @@ class QuillRawEditorState extends EditorState
     if (widget.config.customStyles != null) {
       _styles = _styles!.merge(widget.config.customStyles!);
     }
+    updateRemoteStyleIfNeeded();
   }
 
   bool _shouldShowSelectionHandles() {
